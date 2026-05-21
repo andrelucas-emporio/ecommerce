@@ -1,0 +1,36 @@
+# Firebase Config (NUNCA COMMITAR!)
+firebase-config.js
+.env
+.env.local
+.env.production
+
+# Credenciais Nuvemshop
+nuvemshop-credentials.json
+*.key
+*.pem
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Build
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup local
+backups/
+*.backup
