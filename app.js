@@ -33,12 +33,12 @@ import {
 // NUNCA commite estas configs para o GitHub!
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC...",
-  authDomain: "financehub-xxx.firebaseapp.com",
-  projectId: "financehub-xxx",
-  storageBucket: "financehub-xxx.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123"
+    apiKey: "AIzaSyDxxx...",  // ← SUA API KEY REAL
+    authDomain: "financehub-andre.firebaseapp.com",
+    projectId: "financehub-andre",
+    storageBucket: "financehub-andre.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123def"
 };
 
 
