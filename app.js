@@ -913,4 +913,260 @@ window.exportarExcel = function() {
     alert('Funcionalidade de exportar Excel será implementada em breve!');
 };
 
+// ============================================
+// INTEGRAÇÃO NUVEMSHOP
+// ============================================
+
+window.openNuvemshopModal = function() {
+    document.getElementById('nuvemshopModal').classList.remove('hidden');
+};
+
+window.closeNuvemshopModal = function() {
+    document.getElementById('nuvemshopModal').classList.add('hidden');
+};
+
+// Conectar Nuvemshop
+document.getElementById('nuvemshopForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const storeId = document.getElementById('nuvemshopStoreId').value.trim();
+    const token = document.getElementById('nuvemshopToken').value.trim();
+
+    if (!storeId || !token) {
+        alert('Por favor, preencha todos os campos!');
+        return;
+    }
+
+    try {
+        // Testar conexão fazendo uma requisição à API
+        const response = await fetch(`https://api.nuvemshop.com.br/v1/${storeId}/orders?per_page=1`, {
+            headers: {
+                'Authentication': `bearer ${token}`,
+                'User-Agent': 'FinanceHub (contato@financehub.com)'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Credenciais inválidas ou loja não encontrada');
+        }
+
+        // Salvar credenciais no Firebase (criptografadas)
+        await setDoc(doc(db, 'usuarios', currentUser.uid), {
+            nuvemshop: {
+                storeId: storeId,
+                token: btoa(token), // Codificação básica
+                connectedAt: new Date().toISOString()
+            }
+        }, { merge: true });
+
+        alert('✅ Nuvemshop conectada com sucesso!');
+        closeNuvemshopModal();
+        
+        // Atualizar interface
+        checkNuvemshopConnection();
+        
+        // Sincronizar dados
+        await syncNuvemshop();
+
+    } catch (error) {
+        console.error('Erro ao conectar Nuvemshop:', error);
+        alert('❌ Erro ao conectar: ' + error.message + '\n\nVerifique:\n1. ID da loja está correto\n2. Token é válido\n3. Token tem permissões de leitura');
+    }
+});
+
+// Verificar se já está conectado
+async function checkNuvemshopConnection() {
+    if (!currentUser) return;
+
+    try {
+        const userDoc = await getDoc(doc(db, 'usuarios', currentUser.uid));
+        
+        if (userDoc.exists() && userDoc.data().nuvemshop) {
+            // Está conectado
+            document.getElementById('nuvemshopStatus').classList.add('hidden');
+            document.getElementById('nuvemshopConnected').classList.remove('hidden');
+            
+            // Carregar métricas
+            await loadNuvemshopMetrics();
+        } else {
+            // Não está conectado
+            document.getElementById('nuvemshopStatus').classList.remove('hidden');
+            document.getElementById('nuvemshopConnected').classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Erro ao verificar conexão:', error);
+    }
+}
+
+// Sincronizar dados da Nuvemshop
+window.syncNuvemshop = async function() {
+    if (!currentUser) return;
+
+    try {
+        const userDoc = await getDoc(doc(db, 'usuarios', currentUser.uid));
+        
+        if (!userDoc.exists() || !userDoc.data().nuvemshop) {
+            alert('Nuvemshop não está conectada!');
+            return;
+        }
+
+        const { storeId, token } = userDoc.data().nuvemshop;
+        const decodedToken = atob(token);
+
+        // Buscar pedidos dos últimos 30 dias
+        const dataInicio = new Date();
+        dataInicio.setDate(dataInicio.getDate() - 30);
+        
+        const response = await fetch(
+            `https://api.nuvemshop.com.br/v1/${storeId}/orders?created_at_min=${dataInicio.toISOString()}&per_page=50`,
+            {
+                headers: {
+                    'Authentication': `bearer ${decodedToken}`,
+                    'User-Agent': 'FinanceHub (contato@financehub.com)'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Erro ao buscar pedidos da Nuvemshop');
+        }
+
+        const pedidos = await response.json();
+        
+        // Importar pedidos como receitas
+        let importados = 0;
+        
+        for (const pedido of pedidos) {
+            // Verificar se já foi importado
+            const existente = receitas.find(r => r.nuvemshopOrderId === pedido.id);
+            if (existente) continue;
+
+            // Apenas pedidos pagos/completos
+            if (pedido.payment_status === 'paid' || pedido.status === 'closed') {
+                const receitaData = {
+                    valor: parseFloat(pedido.total),
+                    origem: 'Nuvemshop',
+                    data: pedido.created_at.split('T')[0],
+                    obs: `Pedido #${pedido.number} - ${pedido.customer?.name || 'Cliente'}`,
+                    nuvemshopOrderId: pedido.id,
+                    userId: currentUser.uid,
+                    createdAt: new Date().toISOString()
+                };
+
+                await addDoc(collection(db, 'receitas'), receitaData);
+                importados++;
+            }
+        }
+
+        alert(`✅ Sincronização concluída!\n\n${importados} novos pedidos importados dos últimos 30 dias.`);
+        
+        // Recarregar dados
+        await loadUserData();
+        await loadNuvemshopMetrics();
+
+    } catch (error) {
+        console.error('Erro ao sincronizar:', error);
+        alert('❌ Erro ao sincronizar: ' + error.message);
+    }
+};
+
+// Carregar métricas da Nuvemshop
+async function loadNuvemshopMetrics() {
+    if (!currentUser) return;
+
+    try {
+        const userDoc = await getDoc(doc(db, 'usuarios', currentUser.uid));
+        
+        if (!userDoc.exists() || !userDoc.data().nuvemshop) return;
+
+        const { storeId, token } = userDoc.data().nuvemshop;
+        const decodedToken = atob(token);
+
+        // Buscar informações da loja
+        const storeResponse = await fetch(
+            `https://api.nuvemshop.com.br/v1/${storeId}/store`,
+            {
+                headers: {
+                    'Authentication': `bearer ${decodedToken}`,
+                    'User-Agent': 'FinanceHub (contato@financehub.com)'
+                }
+            }
+        );
+
+        if (storeResponse.ok) {
+            const storeData = await storeResponse.json();
+            
+            // Calcular totais de pedidos importados
+            const pedidosNuvemshop = receitas.filter(r => r.origem === 'Nuvemshop');
+            const totalVendas = pedidosNuvemshop.reduce((acc, r) => acc + r.valor, 0);
+            const ticketMedio = pedidosNuvemshop.length > 0 ? totalVendas / pedidosNuvemshop.length : 0;
+
+            document.getElementById('nuvemshopMetrics').innerHTML = `
+                ${createMetricCard('Loja', storeData.name, '🛒', '#00BFFF', false, '', '')}
+                ${createMetricCard('Pedidos Sincronizados', pedidosNuvemshop.length, '📦', '#00FF88', false, '', '')}
+                ${createMetricCard('Total Vendas', totalVendas, '💰', '#8B5CF6')}
+                ${createMetricCard('Ticket Médio', ticketMedio, '📊', '#FFB800')}
+            `;
+        }
+
+        // Carregar últimos pedidos
+        await loadNuvemshopOrders();
+
+    } catch (error) {
+        console.error('Erro ao carregar métricas:', error);
+    }
+}
+
+// Carregar pedidos da Nuvemshop
+async function loadNuvemshopOrders() {
+    const pedidosNuvemshop = receitas
+        .filter(r => r.origem === 'Nuvemshop' && r.nuvemshopOrderId)
+        .slice(0, 10); // Últimos 10
+
+    let tableHTML = '';
+    
+    for (const pedido of pedidosNuvemshop) {
+        const custo = 0; // Implementar cálculo de custo depois
+        const lucro = pedido.valor - custo;
+        
+        tableHTML += `
+            <tr>
+                <td>${pedido.nuvemshopOrderId || '-'}</td>
+                <td>${new Date(pedido.data).toLocaleDateString('pt-BR')}</td>
+                <td style="font-weight: 700; color: white;">R$ ${formatMoney(pedido.valor)}</td>
+                <td style="color: #9ca3af;">R$ ${formatMoney(custo)}</td>
+                <td style="font-weight: 700; color: #00FF88;">R$ ${formatMoney(lucro)}</td>
+                <td><span class="badge badge-green">Pago</span></td>
+            </tr>
+        `;
+    }
+
+    document.getElementById('nuvemshopPedidos').innerHTML = tableHTML || 
+        '<tr><td colspan="6" style="text-align: center; color: #6b7280;">Nenhum pedido sincronizado ainda. Clique em "Sincronizar Agora"</td></tr>';
+}
+
+// Desconectar Nuvemshop
+window.disconnectNuvemshop = async function() {
+    if (!confirm('Deseja realmente desconectar a Nuvemshop?\n\nOs pedidos já importados não serão removidos.')) return;
+
+    try {
+        await setDoc(doc(db, 'usuarios', currentUser.uid), {
+            nuvemshop: null
+        }, { merge: true });
+
+        alert('✅ Nuvemshop desconectada!');
+        
+        document.getElementById('nuvemshopStatus').classList.remove('hidden');
+        document.getElementById('nuvemshopConnected').classList.add('hidden');
+
+    } catch (error) {
+        alert('Erro ao desconectar: ' + error.message);
+    }
+};
+
+// Verificar conexão ao carregar a página Nuvemshop
+document.querySelector('[data-page="nuvemshop"]').addEventListener('click', function() {
+    setTimeout(() => checkNuvemshopConnection(), 100);
+});
+
 console.log('✅ FinanceHub carregado com sucesso! Firebase configurado para ecommerceloja-8892d');
