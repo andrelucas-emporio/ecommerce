@@ -26,21 +26,17 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // ============================================
-// FIREBASE CONFIG
+// FIREBASE CONFIG - CONFIGURADO PARA ANDRÉ
 // ============================================
-// IMPORTANTE: Estas configurações devem vir de um arquivo .env
-// Para uso local temporário, você pode usar estas configs
-// NUNCA commite estas configs para o GitHub!
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDxxx...",  // ← SUA API KEY REAL
-    authDomain: "financehub-andre.firebaseapp.com",
-    projectId: "financehub-andre",
-    storageBucket: "financehub-andre.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abc123def"
+    apiKey: "AIzaSyCtjkvaWKN0vQJdEjxWc1ibl2hticXXvQg",
+    authDomain: "ecommerceloja-8892d.firebaseapp.com",
+    projectId: "ecommerceloja-8892d",
+    storageBucket: "ecommerceloja-8892d.firebasestorage.app",
+    messagingSenderId: "819590116139",
+    appId: "1:819590116139:web:7041da2fff2248532b4b6e"
 };
-
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
@@ -393,8 +389,6 @@ function renderDespesas() {
     document.getElementById('despesasTable').innerHTML = tableHTML || '<tr><td colspan="6" style="text-align: center; color: #6b7280;">Nenhuma despesa cadastrada</td></tr>';
 }
 
-// Continua no próximo arquivo...
-
 // ============================================
 // RENDER TRÁFEGO
 // ============================================
@@ -412,7 +406,7 @@ function renderTrafego() {
 
     let tableHTML = '';
     trafego.forEach(t => {
-        const roi = 'Calcular...'; // Implementar cálculo de ROI específico
+        const roi = 'Calcular...';
         tableHTML += `
             <tr>
                 <td>${new Date(t.data).toLocaleDateString('pt-BR')}</td>
@@ -919,4 +913,4 @@ window.exportarExcel = function() {
     alert('Funcionalidade de exportar Excel será implementada em breve!');
 };
 
-console.log('FinanceHub carregado com sucesso!');
+console.log('✅ FinanceHub carregado com sucesso! Firebase configurado para ecommerceloja-8892d');
